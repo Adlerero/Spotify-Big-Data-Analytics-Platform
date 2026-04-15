@@ -52,24 +52,47 @@ spotify-bigdata/
 │
 ├── README.md
 │
-├── 1_ingestion/
+├── 1Ingestion/
 │   └── ingest_raw.py                        # Verify files + generate ingestion log
 │
-├── 2_processing/
+├── 2Processing/
 │   ├── spark_cleaning.py                    # OCI Data Flow — cleaning all 4 datasets
 │   ├── spark_joins.py                       # OCI Data Flow — 3 LEFT JOINs
 │   └── spark_aggregations.py               # OCI Data Flow — 6 aggregations + master_ml
 │
-├── 3_streaming/
+├── 3Streaming/
 │   ├── streaming_producer.py               # Generate 1,000 simulated play events
 │   └── streaming_consumer.py              # Micro-batch processing (10 batches x 100)
 │
-├── 4_database/
+├── 4Database/
 │   └── load_to_db.py                       # Load curated CSVs into SQLite
 │
-├── 5_ml/
+├── 5ML/
 │   ├── popularity_regression_local.py      # Full model — 22 features, R²=0.624
 │   └── popularity_regression_audio_only.py # Audio-only model — 13 features, R²=0.156
+│
+└── screenshots/
+    ├── 01_raw_bucket_folder.png
+    ├── 02_ingestion_script_run.png
+    ├── 03_ingestion_log.png
+    ├── 04_dataflow_job_running.png
+    ├── 05_dataflow_job_succeeded.png
+    ├── 06_spark_jobs_ui.png
+    ├── 07_processed_folder.png
+    ├── 08_spark_joins_running.png
+    ├── 09_spark_joins_succeeded.png
+    ├── 10_spark_joins_output.png
+    ├── 11_aggregations_succeeded.png
+    ├── 12_curated_folder.png
+    ├── 13_folder_structure.png
+    ├── 14_streaming_producer_running.png
+    ├── 15_streaming_consumer_output.png
+    ├── 17_db_tables_created.png
+    ├── 18_db_data_loaded.png
+    ├── 20_powerbi_dashboard_p1.png
+    ├── 20_powerbi_dashboard_p2.png
+    ├── 21_ml_training_output.png
+    └── 22_ml_audio_only_output.png
 ```
 
 ---
@@ -125,7 +148,7 @@ oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name r
 ### Step 2 — Run ingestion verification
 
 ```cmd
-python 1_ingestion/ingest_raw.py --bucket bd-raw-spotify --namespace axz6vs6cibbb
+python 1Ingestion/ingest_raw.py --bucket bd-raw-spotify --namespace axz6vs6cibbb
 ```
 
 Expected: `ALL FILES VERIFIED SUCCESSFULLY`
@@ -137,9 +160,9 @@ Expected: `ALL FILES VERIFIED SUCCESSFULLY`
 ### Step 3 — Upload Spark scripts to OCI
 
 ```cmd
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_cleaning.py --file 2_processing/spark_cleaning.py
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_joins.py --file 2_processing/spark_joins.py
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_aggregations.py --file 2_processing/spark_aggregations.py
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_cleaning.py --file 2Processing/spark_cleaning.py
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_joins.py --file 2Processing/spark_joins.py
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_aggregations.py --file 2Processing/spark_aggregations.py
 ```
 
 ---
@@ -223,8 +246,8 @@ oci os object get --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name c
 ### Step 9 — Run streaming simulation
 
 ```cmd
-python 3_streaming/streaming_producer.py --local --events 1000 --rate 50 --csv processed_tracks.csv
-python 3_streaming/streaming_consumer.py --input simulated_events.jsonl --batch-size 100
+python 3Streaming/streaming_producer.py --local --events 1000 --rate 50 --csv processed_tracks.csv
+python 3Streaming/streaming_consumer.py --input simulated_events.jsonl --batch-size 100
 ```
 
 Expected: 10 micro-batches processed, streaming_results.csv generated.
@@ -235,23 +258,51 @@ Expected: 10 micro-batches processed, streaming_results.csv generated.
 
 ### Step 10 — Load SQLite database
 
-Place all curated CSVs + ml_metrics.csv + ml_feature_importance.csv + ml_audio_metrics.csv + ml_audio_feature_importance.csv in the same folder.
+Make sure all the following files are in the **same folder** as `load_to_db.py`:
+
+**From OCI bucket (downloaded in Step 8):**
+- `master_ml.csv` ← from `curated/master_ml/`
+- `agg_genre.csv` ← from `curated/agg_genre/`
+- `agg_year.csv` ← from `curated/agg_year/`
+- `agg_label.csv` ← from `curated/agg_label/`
+- `agg_hit_vs_nohit.csv` ← from `curated/agg_hit_vs_nohit/`
+- `agg_artist.csv` ← from `curated/agg_artist/`
+
+**Generated locally (after Step 11):**
+- `ml_metrics.csv` ← output of `popularity_regression_local.py`
+- `ml_feature_importance.csv` ← output of `popularity_regression_local.py`
+- `ml_audio_metrics.csv` ← output of `popularity_regression_audio_only.py`
+- `ml_audio_feature_importance.csv` ← output of `popularity_regression_audio_only.py`
+
+> Note: Run Step 11 (ML models) first to generate the ml_*.csv files, then come back and run this step.
 
 ```cmd
-python 4_database/load_to_db.py
+python 4Database/load_to_db.py
 ```
 
-Expected: `Done! Database saved as: spotify_analytics.db`
+Expected output:
+```
+fact_popularity    1,145,201
+dim_tracks         1,143,178
+agg_genre                 82
+agg_year                  15
+agg_label                 29
+agg_hit_vs_nohit           2
+ml_metrics                 6
+ml_feature_importance     36
+Done! Database saved as: spotify_analytics.db
+```
 
-📸 Screenshot: DB Browser showing 9 tables.
+📸 Screenshot: DB Browser showing all 9 tables in Database Structure view.
+📸 Screenshot: DB Browser Browse Data showing fact_popularity rows.
 
 ---
 
 ### Step 11 — Train ML models
 
 ```cmd
-python 5_ml/popularity_regression_local.py --csv master_ml.csv --trees 50
-python 5_ml/popularity_regression_audio_only.py --csv master_ml.csv --trees 50
+python 5ML/popularity_regression_local.py --csv master_ml.csv --trees 50
+python 5ML/popularity_regression_audio_only.py --csv master_ml.csv --trees 50
 ```
 
 Expected metrics:
