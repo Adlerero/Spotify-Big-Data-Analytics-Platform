@@ -70,6 +70,29 @@ spotify-bigdata/
 ├── 5ML/
 │   ├── popularity_regression_local.py      # Full model — 22 features, R²=0.624
 │   └── popularity_regression_audio_only.py # Audio-only model — 13 features, R²=0.156
+│
+└── screenshots/
+    ├── 01_raw_bucket_folder.png
+    ├── 02_ingestion_script_run.png
+    ├── 03_ingestion_log.png
+    ├── 04_dataflow_job_running.png
+    ├── 05_dataflow_job_succeeded.png
+    ├── 06_spark_jobs_ui.png
+    ├── 07_processed_folder.png
+    ├── 08_spark_joins_running.png
+    ├── 09_spark_joins_succeeded.png
+    ├── 10_spark_joins_output.png
+    ├── 11_aggregations_succeeded.png
+    ├── 12_curated_folder.png
+    ├── 13_folder_structure.png
+    ├── 14_streaming_producer_running.png
+    ├── 15_streaming_consumer_output.png
+    ├── 17_db_tables_created.png
+    ├── 18_db_data_loaded.png
+    ├── 20_powerbi_dashboard_p1.png
+    ├── 20_powerbi_dashboard_p2.png
+    ├── 21_ml_training_output.png
+    └── 22_ml_audio_only_output.png
 ```
 
 ---
@@ -87,12 +110,23 @@ All datasets sourced from Kaggle. Download and place in the same folder before r
 
 ---
 
+## Configuration
+
+Before running any command, replace these two values throughout all scripts and commands:
+
+| Variable | Your value | Where to find it |
+|---|---|---|
+| `YOUR_BUCKET_NAME` | your OCI bucket name | OCI Console → Object Storage → Buckets |
+| `YOUR_NAMESPACE` | your OCI namespace | Run `oci os ns get` in Cloud Shell or CMD |
+
+---
+
 ## Prerequisites
 
 ### OCI Setup
 - OCI account with access to: Object Storage, Data Flow
 - OCI CLI installed and configured on Windows (`oci setup config`)
-- Bucket created: `bd-raw-spotify` in region `mx-queretaro-1`
+- Bucket created: `YOUR_BUCKET_NAME` in region `mx-queretaro-1`
 - Bucket prefixes created: `raw/`, `processed/`, `curated/`, `scripts/`
 
 ### Local Setup
@@ -112,10 +146,10 @@ oci os ns get
 ### Step 1 — Upload raw datasets to OCI
 
 ```cmd
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/spotify_1m_tracks.csv --file spotify_1m_tracks.csv
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/charts_2023.csv --file charts_2023.csv
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/artist_data_2023.csv --file artist_data_2023.csv
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/albums_data_2023.csv --file albums_data_2023.csv
+oci os object put --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name raw/spotify_1m_tracks.csv --file spotify_1m_tracks.csv
+oci os object put --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name raw/charts_2023.csv --file charts_2023.csv
+oci os object put --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name raw/artist_data_2023.csv --file artist_data_2023.csv
+oci os object put --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name raw/albums_data_2023.csv --file albums_data_2023.csv
 ```
 
 📸 Screenshot: OCI Console showing 4 files in raw/ prefix.
@@ -125,7 +159,7 @@ oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name r
 ### Step 2 — Run ingestion verification
 
 ```cmd
-python 1Ingestion/ingest_raw.py --bucket bd-raw-spotify --namespace axz6vs6cibbb
+python 1Ingestion/ingest_raw.py --bucket YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE
 ```
 
 Expected: `ALL FILES VERIFIED SUCCESSFULLY`
@@ -137,9 +171,9 @@ Expected: `ALL FILES VERIFIED SUCCESSFULLY`
 ### Step 3 — Upload Spark scripts to OCI
 
 ```cmd
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_cleaning.py --file 2Processing/spark_cleaning.py
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_joins.py --file 2Processing/spark_joins.py
-oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_aggregations.py --file 2Processing/spark_aggregations.py
+oci os object put --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name scripts/spark_cleaning.py --file 2Processing/spark_cleaning.py
+oci os object put --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name scripts/spark_joins.py --file 2Processing/spark_joins.py
+oci os object put --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name scripts/spark_aggregations.py --file 2Processing/spark_aggregations.py
 ```
 
 ---
@@ -153,7 +187,7 @@ Create application in OCI Console → Analytics & AI → Data Flow → Applicati
 | Name | `spotify-spark-cleaning` |
 | Language | Python |
 | File name | `scripts/spark_cleaning.py` |
-| Arguments | `bd-raw-spotify axz6vs6cibbb` |
+| Arguments | `YOUR_BUCKET_NAME YOUR_NAMESPACE` |
 | Shape | VM.Standard.E4.Flex, 1 OCPU, 8 GB |
 | Executors | 1 |
 
@@ -199,9 +233,9 @@ Aggregations complete. Curated layer ready.
 ### Step 7 — Verify folder structure
 
 ```cmd
-oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix raw/
-oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix processed/
-oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix curated/
+oci os object list --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --prefix raw/
+oci os object list --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --prefix processed/
+oci os object list --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --prefix curated/
 ```
 
 📸 Screenshot: All 3 prefixes with files visible.
@@ -212,8 +246,8 @@ oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefi
 
 List and download each file using the exact part-00000-*.csv filename:
 ```cmd
-oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix curated/master_ml/
-oci os object get --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name curated/master_ml/EXACT_NAME.csv --file master_ml.csv
+oci os object list --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --prefix curated/master_ml/
+oci os object get --bucket-name YOUR_BUCKET_NAME --namespace YOUR_NAMESPACE --name curated/master_ml/EXACT_NAME.csv --file master_ml.csv
 # Repeat for: agg_genre.csv, agg_year.csv, agg_label.csv, agg_hit_vs_nohit.csv, agg_artist.csv
 # Also download: processed/tracks/EXACT_NAME.csv → processed_tracks.csv
 ```
