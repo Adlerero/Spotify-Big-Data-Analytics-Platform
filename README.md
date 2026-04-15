@@ -70,29 +70,6 @@ spotify-bigdata/
 ├── 5_ml/
 │   ├── popularity_regression_local.py      # Full model — 22 features, R²=0.624
 │   └── popularity_regression_audio_only.py # Audio-only model — 13 features, R²=0.156
-│
-└── screenshots/
-    ├── 01_raw_bucket_folder.png
-    ├── 02_ingestion_script_run.png
-    ├── 03_ingestion_log.png
-    ├── 04_dataflow_job_running.png
-    ├── 05_dataflow_job_succeeded.png
-    ├── 06_spark_jobs_ui.png
-    ├── 07_processed_folder.png
-    ├── 08_spark_joins_running.png
-    ├── 09_spark_joins_succeeded.png
-    ├── 10_spark_joins_output.png
-    ├── 11_aggregations_succeeded.png
-    ├── 12_curated_folder.png
-    ├── 13_folder_structure.png
-    ├── 14_streaming_producer_running.png
-    ├── 15_streaming_consumer_output.png
-    ├── 17_db_tables_created.png
-    ├── 18_db_data_loaded.png
-    ├── 20_powerbi_dashboard_p1.png
-    ├── 20_powerbi_dashboard_p2.png
-    ├── 21_ml_training_output.png
-    └── 22_ml_audio_only_output.png
 ```
 
 ---
