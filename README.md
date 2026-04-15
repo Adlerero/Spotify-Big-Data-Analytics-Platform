@@ -1,20 +1,47 @@
 # Spotify Big Data Analytics Platform
-**Big Data Final Project — Universidad Panamericana**
-**Course:** Machine Learning II (Big Data)
-**Student:** Adler Antonio Calvillo Arellano
-**Platform:** Oracle Cloud Infrastructure (OCI)
+**What Makes a Song Successful on Spotify?**
+
+**Course:** Big Data — Universidad Panamericana, Campus Aguascalientes  
+**Student:** Adler Antonio Calvillo Arellano (ID: 0257691)  
+**Professor:** Alfredo Márquez Martínez  
+**Platform:** Oracle Cloud Infrastructure (OCI) + Local (Spark MLlib, SQLite, Power BI)
 
 ---
 
 ## Project Overview
 
-End-to-end Big Data pipeline that processes over 1.15 million Spotify tracks to identify the patterns that determine a song's success. Combines audio features, artist profiles, album metadata, and real chart data to answer: *What makes a song popular on Spotify?*
+End-to-end Big Data pipeline that processes over 1.15 million Spotify tracks to identify the patterns that determine a song's success. Combines audio features, artist profiles, album metadata, and real chart data across 8 pipeline layers.
 
-**Datasets used:**
-- Spotify 1 Million Tracks — 1,159,765 rows (Kaggle)
-- Most Streamed Spotify Songs 2023 — 954 rows (Kaggle)
-- Spotify Artist Data 2023 — 37,013 rows (Kaggle)
-- Spotify Albums Data 2023 — 438,974 rows (Kaggle)
+**Central question:** What factors determine the success of a song on Spotify — its audio characteristics, the artist's profile, or the distribution strategy behind it?
+
+**Key finding:** Genre (66.3%) and release year (22.0%) together explain 88% of popularity variance. All 13 audio features combined account for less than 5%.
+
+---
+
+## Architecture
+
+```
+Data Sources (4 Kaggle CSVs)
+        ↓
+Ingestion (Python + OCI CLI)
+        ↓
+OCI Object Storage — Data Lake
+    raw/          ← original unmodified CSVs
+    processed/    ← cleaned + joined by Spark
+    curated/      ← aggregations + ML-ready dataset
+        ↓
+Batch Processing (OCI Data Flow — PySpark)
+    spark_cleaning.py → spark_joins.py → spark_aggregations.py
+        ↓
+Streaming Simulation (Python local)
+    streaming_producer.py → streaming_consumer.py
+        ↓
+Analytical Model (SQLite — 9 tables, 1.1M+ rows)
+        ↓
+Visualization (Power BI Desktop — 7 charts)
+        ↓
+AI Component (Spark MLlib local — 2 Random Forest models)
+```
 
 ---
 
@@ -22,222 +49,282 @@ End-to-end Big Data pipeline that processes over 1.15 million Spotify tracks to 
 
 ```
 spotify-bigdata/
+│
 ├── README.md
+│
 ├── 1_ingestion/
-│   └── download_datasets.py        # Downloads CSVs and uploads to OCI raw/
+│   └── ingest_raw.py                        # Verify files + generate ingestion log
+│
 ├── 2_processing/
-│   ├── spark_cleaning.py           # Null removal, type casting, normalization
-│   ├── spark_joins.py              # Joins: tracks + artists + charts + albums
-│   └── spark_aggregations.py      # GroupBy genre, year, label, artist
+│   ├── spark_cleaning.py                    # OCI Data Flow — cleaning all 4 datasets
+│   ├── spark_joins.py                       # OCI Data Flow — 3 LEFT JOINs
+│   └── spark_aggregations.py               # OCI Data Flow — 6 aggregations + master_ml
+│
 ├── 3_streaming/
-│   ├── streaming_producer.py       # Simulates track play events to OCI Streaming
-│   └── streaming_consumer.py      # Spark micro-batch consumer
+│   ├── streaming_producer.py               # Generate 1,000 simulated play events
+│   └── streaming_consumer.py              # Micro-batch processing (10 batches x 100)
+│
 ├── 4_database/
-│   ├── create_tables.sql           # PostgreSQL DDL
-│   └── load_to_db.py               # Loads curated data to PostgreSQL
+│   └── load_to_db.py                       # Load curated CSVs into SQLite
+│
 ├── 5_ml/
-│   └── popularity_regression.py   # Random Forest Regressor with Spark MLlib
+│   ├── popularity_regression_local.py      # Full model — 22 features, R²=0.624
+│   └── popularity_regression_audio_only.py # Audio-only model — 13 features, R²=0.156
+│
 └── screenshots/
     ├── 01_raw_bucket_folder.png
     ├── 02_ingestion_script_run.png
-    └── ... (all execution evidence)
+    ├── 03_ingestion_log.png
+    ├── 04_dataflow_job_running.png
+    ├── 05_dataflow_job_succeeded.png
+    ├── 06_spark_jobs_ui.png
+    ├── 07_processed_folder.png
+    ├── 08_spark_joins_running.png
+    ├── 09_spark_joins_succeeded.png
+    ├── 10_spark_joins_output.png
+    ├── 11_aggregations_succeeded.png
+    ├── 12_curated_folder.png
+    ├── 13_folder_structure.png
+    ├── 14_streaming_producer_running.png
+    ├── 15_streaming_consumer_output.png
+    ├── 17_db_tables_created.png
+    ├── 18_db_data_loaded.png
+    ├── 20_powerbi_dashboard_p1.png
+    ├── 20_powerbi_dashboard_p2.png
+    ├── 21_ml_training_output.png
+    └── 22_ml_audio_only_output.png
 ```
+
+---
+
+## Datasets
+
+All datasets sourced from Kaggle. Download and place in the same folder before running scripts.
+
+| File | Source | Rows |
+|---|---|---|
+| `spotify_1m_tracks.csv` | kaggle.com/datasets/amitanshjoshi/spotify-1million-tracks | 1,159,764 |
+| `charts_2023.csv` | kaggle.com/datasets/nelgiriyewithana/top-spotify-songs-2023 | 953 |
+| `artist_data_2023.csv` | kaggle.com/datasets/tonygordonjr/spotify-dataset-2023 | 37,012 |
+| `albums_data_2023.csv` | kaggle.com/datasets/tonygordonjr/spotify-dataset-2023 | 438,973 |
 
 ---
 
 ## Prerequisites
 
 ### OCI Setup
-- OCI account with access to: Object Storage, Data Flow, Streaming, DB System, NoSQL Database
-- OCI CLI configured in Cloud Shell
-- A bucket created (e.g. `spotify-bigdata-bucket`) with prefixes: `raw/`, `processed/`, `curated/`, `scripts/`
+- OCI account with access to: Object Storage, Data Flow
+- OCI CLI installed and configured on Windows (`oci setup config`)
+- Bucket created: `bd-raw-spotify` in region `mx-queretaro-1`
+- Bucket prefixes created: `raw/`, `processed/`, `curated/`, `scripts/`
 
-### Python dependencies (Cloud Shell)
-```bash
-pip install kaggle pandas
+### Local Setup
+```cmd
+pip install pyspark pandas
 ```
 
-### Configure Kaggle API
-```bash
-mkdir -p ~/.kaggle
-# Upload your kaggle.json to Cloud Shell, then:
-cp kaggle.json ~/.kaggle/
-chmod 600 ~/.kaggle/kaggle.json
+### Verify OCI CLI
+```cmd
+oci os ns get
 ```
 
 ---
 
 ## Step-by-Step Execution
 
-### Step 1 — Ingest raw data
+### Step 1 — Upload raw datasets to OCI
 
-```bash
-# In OCI Cloud Shell:
-python3 1_ingestion/download_datasets.py
+```cmd
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/spotify_1m_tracks.csv --file spotify_1m_tracks.csv
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/charts_2023.csv --file charts_2023.csv
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/artist_data_2023.csv --file artist_data_2023.csv
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name raw/albums_data_2023.csv --file albums_data_2023.csv
 ```
 
-This script will:
-1. Download all 4 datasets from Kaggle
-2. Upload them to `raw/` in OCI Object Storage
-3. Write a timestamped `ingestion_log.txt`
-
-**Screenshot:** raw/ folder in OCI Object Storage bucket showing all 4 files.
+📸 Screenshot: OCI Console showing 4 files in raw/ prefix.
 
 ---
 
-### Step 2 — Verify raw layer
+### Step 2 — Run ingestion verification
 
-```bash
-oci os object list --bucket-name spotify-bigdata-bucket --prefix raw/
+```cmd
+python 1_ingestion/ingest_raw.py --bucket bd-raw-spotify --namespace axz6vs6cibbb
 ```
 
-**Screenshot:** Terminal output listing raw files with sizes.
+Expected: `ALL FILES VERIFIED SUCCESSFULLY`
+
+📸 Screenshot: Terminal output.
 
 ---
 
-### Step 3 — Run Spark cleaning job (OCI Data Flow)
+### Step 3 — Upload Spark scripts to OCI
 
-1. Upload script to OCI:
-```bash
-oci os object put \
-  --bucket-name spotify-bigdata-bucket \
-  --file 2_processing/spark_cleaning.py \
-  --name scripts/spark_cleaning.py
-```
-
-2. Create and run Data Flow application pointing to `scripts/spark_cleaning.py`
-3. Input: `oci://spotify-bigdata-bucket/raw/`
-4. Output: `oci://spotify-bigdata-bucket/processed/`
-
-**Screenshot:** OCI Data Flow job status = Succeeded.
-
----
-
-### Step 4 — Run Spark joins job
-
-```bash
-oci os object put \
-  --bucket-name spotify-bigdata-bucket \
-  --file 2_processing/spark_joins.py \
-  --name scripts/spark_joins.py
-```
-
-Run as Data Flow application. Output → `processed/joined/`
-
-**Screenshot:** Spark `.show()` output of joined DataFrame.
-
----
-
-### Step 5 — Run Spark aggregations job
-
-```bash
-oci os object put \
-  --bucket-name spotify-bigdata-bucket \
-  --file 2_processing/spark_aggregations.py \
-  --name scripts/spark_aggregations.py
-```
-
-Output → `curated/`
-
-**Screenshot:** Aggregation results by genre and year.
-
----
-
-### Step 6 — Run streaming simulation
-
-Terminal 1 (producer):
-```bash
-python3 3_streaming/streaming_producer.py
-```
-
-Terminal 2 (consumer — run as Data Flow or local Spark):
-```bash
-python3 3_streaming/streaming_consumer.py
-```
-
-**Screenshot:** OCI Streaming console showing incoming messages + consumer output.
-
----
-
-### Step 7 — Create and load PostgreSQL database
-
-```bash
-# Connect to OCI DB System and run DDL:
-psql -h <db-host> -U admin -d spotifydb -f 4_database/create_tables.sql
-
-# Load data:
-python3 4_database/load_to_db.py
-```
-
-**Screenshot:** `\dt` command showing tables created + `SELECT COUNT(*)` on each table.
-
----
-
-### Step 8 — Train ML model
-
-```bash
-oci os object put \
-  --bucket-name spotify-bigdata-bucket \
-  --file 5_ml/popularity_regression.py \
-  --name scripts/popularity_regression.py
-```
-
-Run as Data Flow application. Input: curated ML-ready dataset.
-
-**Screenshot:** Terminal showing RMSE, R², and sample predictions.
-
----
-
-### Step 9 — Build Power BI dashboard
-
-1. Connect Power BI Desktop to OCI PostgreSQL
-2. Import curated tables
-3. Build visualizations (see report Section 8 for details)
-
-**Screenshot:** Completed dashboard with all 4 charts.
-
----
-
-## Architecture Summary
-
-```
-Data Sources (Kaggle CSVs)
-        ↓
-Ingestion (Python + OCI Cloud Shell)
-        ↓
-Raw Layer (OCI Object Storage — raw/)
-        ↓
-Batch Processing (OCI Data Flow — PySpark)
-  · Cleaning  · Transforms  · Joins  · Aggregations
-        ↓
-Processed Layer (OCI Object Storage — processed/)
-        ↓
-Curated Layer (OCI Object Storage — curated/)
-        ↓
-Streaming Simulation (OCI Streaming — Kafka-compatible)
-        ↓
-Analytical Model (PostgreSQL + OCI NoSQL)
-        ↓
-Visualization (Power BI Dashboard)
-        ↓
-AI Component (Spark MLlib — Random Forest Regression)
+```cmd
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_cleaning.py --file 2_processing/spark_cleaning.py
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_joins.py --file 2_processing/spark_joins.py
+oci os object put --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name scripts/spark_aggregations.py --file 2_processing/spark_aggregations.py
 ```
 
 ---
 
-## Key Analytical Questions Answered
+### Step 4 — Run spark_cleaning.py (OCI Data Flow)
 
-1. What audio features most strongly predict a song's popularity score?
-2. Do artists with more followers consistently produce more popular songs?
-3. How have danceability, energy, and valence evolved from 2009 to 2024?
-4. Which record labels dominate the most popular genres?
-5. What distinguishes the 954 chart hits from the remaining 1.15M songs?
+Create application in OCI Console → Analytics & AI → Data Flow → Applications:
+
+| Field | Value |
+|---|---|
+| Name | `spotify-spark-cleaning` |
+| Language | Python |
+| File name | `scripts/spark_cleaning.py` |
+| Arguments | `bd-raw-spotify axz6vs6cibbb` |
+| Shape | VM.Standard.E4.Flex, 1 OCPU, 8 GB |
+| Executors | 1 |
+
+Expected log output:
+```
+[1/4] Cleaning spotify_1m_tracks... Cleaned rows: 1,156,328
+[4/4] Cleaning albums_data_2023...  Cleaned rows: 438,522
+```
+
+📸 Screenshot: OCI Data Flow job Succeeded.
+
+---
+
+### Step 5 — Run spark_joins.py (OCI Data Flow)
+
+Same configuration, file: `scripts/spark_joins.py`
+
+Expected log output:
+```
+Final master table rows    : 1,158,376
+Final master table columns : 39
+```
+
+📸 Screenshot: OCI Data Flow job Succeeded.
+
+---
+
+### Step 6 — Run spark_aggregations.py (OCI Data Flow)
+
+Same configuration, file: `scripts/spark_aggregations.py`
+
+Expected log output:
+```
+Genres found: 82
+ML dataset rows: 1,158,376
+Aggregations complete. Curated layer ready.
+```
+
+📸 Screenshot: OCI Data Flow job Succeeded.
+
+---
+
+### Step 7 — Verify folder structure
+
+```cmd
+oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix raw/
+oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix processed/
+oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix curated/
+```
+
+📸 Screenshot: All 3 prefixes with files visible.
+
+---
+
+### Step 8 — Download curated CSVs for local steps
+
+List and download each file using the exact part-00000-*.csv filename:
+```cmd
+oci os object list --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --prefix curated/master_ml/
+oci os object get --bucket-name bd-raw-spotify --namespace axz6vs6cibbb --name curated/master_ml/EXACT_NAME.csv --file master_ml.csv
+# Repeat for: agg_genre.csv, agg_year.csv, agg_label.csv, agg_hit_vs_nohit.csv, agg_artist.csv
+# Also download: processed/tracks/EXACT_NAME.csv → processed_tracks.csv
+```
+
+---
+
+### Step 9 — Run streaming simulation
+
+```cmd
+python 3_streaming/streaming_producer.py --local --events 1000 --rate 50 --csv processed_tracks.csv
+python 3_streaming/streaming_consumer.py --input simulated_events.jsonl --batch-size 100
+```
+
+Expected: 10 micro-batches processed, streaming_results.csv generated.
+
+📸 Screenshots: Producer running + Consumer micro-batch output.
+
+---
+
+### Step 10 — Load SQLite database
+
+Place all curated CSVs + ml_metrics.csv + ml_feature_importance.csv + ml_audio_metrics.csv + ml_audio_feature_importance.csv in the same folder.
+
+```cmd
+python 4_database/load_to_db.py
+```
+
+Expected: `Done! Database saved as: spotify_analytics.db`
+
+📸 Screenshot: DB Browser showing 9 tables.
+
+---
+
+### Step 11 — Train ML models
+
+```cmd
+python 5_ml/popularity_regression_local.py --csv master_ml.csv --trees 50
+python 5_ml/popularity_regression_audio_only.py --csv master_ml.csv --trees 50
+```
+
+Expected metrics:
+- Full model: RMSE=9.74, R²=0.624
+- Audio-only: RMSE=14.60, R²=0.156
+
+📸 Screenshot: Terminal showing metrics and feature importance.
+
+---
+
+### Step 12 — Build Power BI Dashboard
+
+1. Install: http://www.ch-werner.de/sqliteodbc/sqliteodbc_w64.exe
+2. Configure DSN via odbcad32: Name=`SpotifyDB`, path to `spotify_analytics.db`
+3. Power BI → Get Data → ODBC → SpotifyDB
+4. Load: `agg_genre`, `agg_hit_vs_nohit`, `agg_year`, `dim_artists`, `ml_feature_importance`, `ml_metrics`, `agg_label`
+5. Build 7 charts as described in Final Report Section 8
+
+📸 Screenshot: Completed dashboard (2 pages).
+
+---
+
+## Results Summary
+
+| Metric | Value |
+|---|---|
+| Total tracks processed | 1,158,376 |
+| Genres analyzed | 82 |
+| Chart hits identified | 373 |
+| Full model R² | 0.6240 |
+| Audio-only model R² | 0.1562 |
+| Top predictor | genre_index (66.3%) |
+| SQLite tables | 9 |
+| Power BI charts | 7 |
+
+---
+
+## Key Findings
+
+1. **Genre explains 66% of popularity** — genre positioning matters more than how a song sounds.
+2. **Audio features alone explain only 15.6%** — R² drops from 0.624 to 0.156 without context features.
+3. **Chart hits and non-hits sound almost identical** — the 55-point popularity gap is driven by distribution, not sonic quality.
+4. **Pop dominates** with avg popularity 55.70, followed by hip-hop (46.41) and rock (46.27).
+5. **Loudness and duration** are the strongest audio predictors — not danceability or energy.
 
 ---
 
 ## Notes
 
-- All raw datasets must be kept in their original unprocessed form in `raw/`
-- Do not re-upload pre-cleaned datasets — the pipeline performs all cleaning internally
-- OCI Data Flow minimum configuration: 1 OCPU, 8GB memory (VM.Standard.E3.Flex)
-- Spark output files follow the `part-00000-*.csv` naming convention — this is expected
+- Raw CSV files must remain in their original downloaded form — never upload pre-cleaned data.
+- OCI Data Flow output files use the naming convention `part-00000-*.csv` — this is expected.
+- The SQLite database (`spotify_analytics.db`) is generated locally and not stored in OCI.
+- Spark MLlib was run locally due to an OCI Data Flow internal network timeout during the ML job.
